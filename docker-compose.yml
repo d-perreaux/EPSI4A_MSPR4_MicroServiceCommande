@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"   
+      - "15672:15672"   
+    hostname: rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mspr4-network
+    
+  test-todo:
+    image: dperreaux/mspr4-test-todo:latest
+    container_name: test-todo
+    hostname: test-todo
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "3012:8080"
+    env_file:
+          - ./envs/.env.dockercompose.todo
+    networks:
+      - mspr4-network
+      - elk
+
+  produit:
+    image: genessy/epsi4a-mspr4-msproduct:0.2
+    container_name: produit
+    hostname: produit
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "3022:8080"
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/serviceAccountKey.json
+    volumes:
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json
+    networks:
+      - mspr4-network
+      - elk
+
+  client:
+    image: antoineletailleur/epsi4a-mspr4-msclient:0.3
+    container_name: client
+    hostname: client
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "3033:8080"
+    env_file:
+      - ./envs/.env.dockercompose.client
+    networks:
+      - mspr4-network
+      - elk
+
+  # fidelite:
+  #   image: gmeline/epsi4a-mspr4-msfidelity:0.1
+  #   container_name: fidelite
+  #   hostname: fidelite
+  #   ports:
+  #     - "3044:8080"
+  #   networks:
+  #     - mspr4-network
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.9.3
+    environment:
+      - discovery.type=single-node
+    ports:
+      - "9200:9200"
+    networks:
+      - elk
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.9.3
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+    ports:
+      - "5000:5000"
+      - "5044:5044"
+    networks:
+      - elk
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.9.3
+    ports:
+      - "5601:5601"
+    networks:
+      - elk
+
+networks:
+  mspr4-network:
+    driver: bridge
+  elk:
+    driver: bridge
