@@ -1,7 +1,8 @@
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
-// namespace API.Model {
+namespace APIOrder.Model {
+    [BsonIgnoreExtraElements]
     public class Order
     {
         [BsonId]
@@ -18,7 +19,10 @@ using MongoDB.Bson.Serialization.Attributes;
         [BsonElement("status")]
         public string Status { get; set; } = string.Empty;
 
+        [BsonElement("address")]
+        public string Address { get; set; } = string.Empty;
+
         [BsonElement("products")]
-        public List<int> Products { get; set; } = new List<int>();
+        public List<Product> Products { get; set; } = new List<Product>();
     }
-// }
+}

@@ -1,11 +1,12 @@
-version: '3.8'
-
 services:
   rabbitmq:
     image: rabbitmq:3-management
     ports:
       - "5672:5672"   
       - "15672:15672"   
+      - "15692:15692"
+    command: >
+      bash -c "rabbitmq-plugins enable --offline rabbitmq_prometheus && rabbitmq-server"
     hostname: rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmqctl", "status"]
@@ -14,58 +15,53 @@ services:
       retries: 5
     networks:
       - mspr4-network
+      - metrics
     
-  test-todo:
-    image: dperreaux/mspr4-test-todo:latest
-    container_name: test-todo
-    hostname: test-todo
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    ports:
-      - "3012:8080"
-    env_file:
-          - ./envs/.env.dockercompose.todo
-    networks:
-      - mspr4-network
-      - elk
 
   produit:
-    image: genessy/epsi4a-mspr4-msproduct:0.2
+    image: genessy/epsi4a-mspr4-msproduct:0.4.5
     container_name: produit
     hostname: produit
     depends_on:
       rabbitmq:
         condition: service_healthy
     ports:
-      - "3022:8080"
-    environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/serviceAccountKey.json
+      - "3022:3022"
+    env_file:
+      - ./envs/.env.dockercompose.product
     volumes:
-      - ./serviceAccountKey.json:/app/serviceAccountKey.json
+      - ./serviceAccountKey.json:/app/credentials/serviceAccountKey.json
+      - ./logs:/app/logs
     networks:
       - mspr4-network
       - elk
-
+      - metrics
+    
   client:
-    image: antoineletailleur/epsi4a-mspr4-msclient:0.3
+    image: antoineletailleur/epsi4a-mspr4-msclient:0.4
     container_name: client
     hostname: client
     depends_on:
       rabbitmq:
         condition: service_healthy
     ports:
-      - "3033:8080"
+      - "3033:3033"
+      - "3013:3013"
     env_file:
       - ./envs/.env.dockercompose.client
     networks:
       - mspr4-network
       - elk
+      - metrics
 
   # fidelite:
-  #   image: gmeline/epsi4a-mspr4-msfidelity:0.1
+  #   image: gmeline/epsi4a-mspr4-msfidelity:0.3
   #   container_name: fidelite
   #   hostname: fidelite
+  #   depends_on:
+  #     rabbitmq:
+  #       condition: service_healthy
+  #   platform: linux/arm64
   #   ports:
   #     - "3044:8080"
   #   networks:
@@ -97,8 +93,33 @@ services:
     networks:
       - elk
 
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - metrics
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - metrics
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+
 networks:
   mspr4-network:
     driver: bridge
   elk:
+    driver: bridge
+  metrics:
     driver: bridge

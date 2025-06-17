@@ -58,3 +58,5 @@ appsettings.json
 
 **/.env*
 serviceAccountKey.json
+
+.sonarqube/
