@@ -9,11 +9,12 @@ using APIOrder.Model;
 using APIOrder.Services.Mongo;
 using APIOrder.Services.RabbitMQ;
 using APIOrder.Services;
+using Microsoft.AspNetCore.Mvc;
 
 namespace APIOrder.Endpoints
 {
     public static class OrderEndpoints{
-        public static async Task<IResult> GetAllOrders(IDataBaseService orderService)
+        public static async Task<IResult> GetAllOrders([FromServices] IDataBaseService orderService)
         {
             AppMetrics.RequestCounter.Add(1, KeyValuePair.Create<string, object?>("endpoint", "get/v1/orders"));
             Log.Information("Ask for all orders");
@@ -35,7 +36,7 @@ namespace APIOrder.Endpoints
             return TypedResults.Ok(response);
         }
 
-        public static async Task<IResult> GetOrderById(IDataBaseService orderService, string id)
+        public static async Task<IResult> GetOrderById([FromServices] IDataBaseService orderService, string id)
         {
             AppMetrics.RequestCounter.Add(1, KeyValuePair.Create<string, object?>("endpoint", "get/v1/orders/{id}"));
             if (!ObjectId.TryParse(id, out var objectId))
@@ -59,7 +60,7 @@ namespace APIOrder.Endpoints
             );
         }
 
-        public static async Task<IResult> CreateOrder(IDataBaseService orderService, OrderDto orderDto, RabbitMQPublisher publisher)
+        public static async Task<IResult> CreateOrder([FromServices] IDataBaseService orderService, OrderDto orderDto, RabbitMQPublisher publisher)
         {
             AppMetrics.RequestCounter.Add(1, KeyValuePair.Create<string, object?>("endpoint", "post/v1/orders/"));
             var order = orderDto.ToOrder();
@@ -103,7 +104,7 @@ namespace APIOrder.Endpoints
             );
         }
 
-        public static async Task<IResult> UpdateOrder(IDataBaseService orderService, string id, OrderDto orderDto)
+        public static async Task<IResult> UpdateOrder([FromServices] IDataBaseService orderService, string id, OrderDto orderDto)
         {
             AppMetrics.RequestCounter.Add(1, KeyValuePair.Create<string, object?>("endpoint", "put/v1/orders/{id}"));
             if (!ObjectId.TryParse(id, out var objectId))
@@ -122,7 +123,7 @@ namespace APIOrder.Endpoints
             );
         }
 
-        public static async Task<IResult> DeleteOrder(IDataBaseService orderService, string id)
+        public static async Task<IResult> DeleteOrder([FromServices] IDataBaseService orderService, string id)
         {
             AppMetrics.RequestCounter.Add(1, KeyValuePair.Create<string, object?>("endpoint", "delete/v1/orders/{id}"));
             if (!ObjectId.TryParse(id, out var objectId))

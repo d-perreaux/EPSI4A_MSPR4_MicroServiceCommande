@@ -13,6 +13,7 @@ using APIOrder.Model;
 using APIOrder.Endpoints;
 using APIOrder.Services.Mongo;
 using APIOrder.Services.RabbitMQ;
+using APIOrder.Services;
 
 try
 {
@@ -49,7 +50,7 @@ try
         });
 
     builder.Services.AddDatabaseDeveloperPageExceptionFilter();
-    builder.Services.AddSingleton<MongoOrderService>();
+    builder.Services.AddSingleton<IDataBaseService, MongoOrderService>();
      string rabbitMqHost = builder.Configuration.GetSection("RabbitMQ:Host").Value!;
     builder.Services.AddSingleton(sp => new RabbitMQPublisher(rabbitMqHost));
     builder.Services.AddHostedService<RabbitMQBackgroundService>();
@@ -85,28 +86,10 @@ try
             config.DocExpansion = "list";
         });
     }
-    
 
     app.MapGet("/", () => "Gut");
 
-    var client = new HttpClient();
-
-    string todoHost = builder.Configuration.GetSection("Services:TestTodo").Value!;
-    app.MapGet("/todo", async () =>
-    {
-        var response = await client.GetStringAsync($"http://{todoHost}/todoitems");
-        return TypedResults.Ok(response);
-    });
-
-    string productHost = builder.Configuration.GetSection("Services:Produit").Value!;
-    app.MapGet("/produits", async () =>
-    {
-        var response = await client.GetStringAsync($"http://{productHost}/products");
-        return TypedResults.Ok(response);
-    });
-
     var orders = app.MapGroup("/api/v1/orders");
-
     orders.MapGet("/", OrderEndpoints.GetAllOrders);
     orders.MapGet("/{id}", OrderEndpoints.GetOrderById);
     orders.MapPost("/", OrderEndpoints.CreateOrder);
