@@ -1,5 +1,18 @@
 **/.env*
 .git
 .sonarqube/
+logstash/
+trivy-reports/
+
+.gitignore
+.trivyignore
+
+commandes.md
+Dockerfile
+docker-compose.yml
+prometheus.yml
+README.md
+
+APICommande.Tests
 
 serviceAccountKey.json
