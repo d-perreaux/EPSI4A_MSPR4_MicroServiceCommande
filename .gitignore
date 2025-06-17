@@ -60,3 +60,4 @@ appsettings.json
 serviceAccountKey.json
 
 .sonarqube/
+trivy-reports/
