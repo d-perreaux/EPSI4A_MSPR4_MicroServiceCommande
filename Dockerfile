@@ -3,9 +3,12 @@ WORKDIR /app
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
+
+COPY ["APICommande/APICommande.csproj", "APICommande/"]
+RUN dotnet restore "APICommande/APICommande.csproj"
+
 COPY . .
-RUN dotnet restore
-RUN dotnet publish -c Release -o /app
+RUN dotnet publish "APICommande/APICommande.csproj" -c Release -o /app
 
 FROM base AS final
 WORKDIR /app

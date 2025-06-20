@@ -87,14 +87,23 @@ try
         });
     }
 
-    app.MapGet("/", () => "Gut");
+    
 
+    var nameApi = "API Orders";
     var orders = app.MapGroup("/api/v1/orders");
-    orders.MapGet("/", OrderEndpoints.GetAllOrders);
-    orders.MapGet("/{id}", OrderEndpoints.GetOrderById);
-    orders.MapPost("/", OrderEndpoints.CreateOrder);
-    orders.MapPut("/{id}", OrderEndpoints.UpdateOrder);
-    orders.MapDelete("/{id}", OrderEndpoints.DeleteOrder);
+    orders.MapGet("/", OrderEndpoints.GetAllOrders)
+        .WithTags(nameApi);
+    orders.MapGet("/{id}", OrderEndpoints.GetOrderById)
+        .WithTags(nameApi);
+    orders.MapPost("/", OrderEndpoints.CreateOrder)
+        .WithTags(nameApi);
+    orders.MapPut("/{id}", OrderEndpoints.UpdateOrder)
+        .WithTags(nameApi);
+    orders.MapDelete("/{id}", OrderEndpoints.DeleteOrder)
+        .WithTags(nameApi);
+
+    app.MapGet("/", () => "Gut")
+        .WithTags("Test");
 
     app.UseOpenTelemetryPrometheusScrapingEndpoint();
 

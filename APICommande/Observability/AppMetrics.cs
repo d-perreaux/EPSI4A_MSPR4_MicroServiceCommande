@@ -6,7 +6,8 @@ namespace APIOrder.Utilitaires
     {
         public readonly static Meter Meter = new("APIMetrics.Meter", "1.0");
 
-        public readonly static Counter<long> RequestCounter = Meter.CreateCounter<long>("request_count");
+        public readonly static Counter<long> RequestCounter = Meter.CreateCounter<long>("request_count_total");
+        public readonly static Counter<long> HttpResponseCounter = Meter.CreateCounter<long>("http_response_code_total");
         public readonly static UpDownCounter<int> ActiveOrders = Meter.CreateUpDownCounter<int>("active_orders");
         public readonly static Histogram<double> ResponseTimes = Meter.CreateHistogram<double>("response_time_ms");
 
