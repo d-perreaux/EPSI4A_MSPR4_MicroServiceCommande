@@ -2,6 +2,7 @@ using Microsoft.Extensions.Hosting;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Serilog;
 
 namespace APIOrder.Services.RabbitMQ
 {

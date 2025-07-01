@@ -46,6 +46,5 @@ namespace APICommande.Tests
             _output.WriteLine($"dataList : {dataList}");
             Assert.Single(dataList);
         }
-
     }
 }

@@ -16,10 +16,19 @@ services:
     networks:
       - mspr4-network
       - metrics
-    
+  
+  bff:
+    image: eliseomurillo9/bff-paye-ton-kawa:0.2
+    container_name: bff
+    hostname: bff
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./envs/.env.dockercompose.bff
+      
 
   produit:
-    image: genessy/epsi4a-mspr4-msproduct:0.4.5
+    image: genessy/epsi4a-mspr4-msproduct:0.5
     container_name: produit
     hostname: produit
     depends_on:
@@ -38,7 +47,7 @@ services:
       - metrics
     
   client:
-    image: antoineletailleur/epsi4a-mspr4-msclient:0.4
+    image: antoineletailleur/epsi4a-mspr4-msclient:0.7
     container_name: client
     hostname: client
     depends_on:
@@ -115,6 +124,22 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     depends_on:
       - prometheus
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    hostname: jaeger
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "4317:4317"   # OTLP gRPC collector (pour les traces depuis le BFF)
+      - "4318:4318"   # OTLP HTTP collector (alternative, moins utilisé)
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true # Active le collecteur OTLP
+    restart: unless-stopped
+    networks:
+      - metrics
+    # volume:
+    #   - ./collector-config.yaml:/etc/otelcol/config.yaml
 
 networks:
   mspr4-network:

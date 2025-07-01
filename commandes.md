@@ -1,6 +1,6 @@
-docker build -t dperreaux/epsi4a-mspr4-msorder:0.4 .
+docker build -t dperreaux/epsi4a-mspr4-msorder:0.5 .
 
-docker push dperreaux/epsi4a-mspr4-msorder:0.4  
+docker push dperreaux/epsi4a-mspr4-msorder:0.5  
 
 docker run -d -p 8080:8080 dperreaux/epsi4a-mspr4-msorder:tagname
 
@@ -33,9 +33,9 @@ docker run -d --name sonarqube -p 9000:9000 -e SONAR_JDBC_URL=jdbc:postgresql://
 - Création utilisateur sonarqube
 - Donner les droits à l'utilisateur
 
-dotnet sonarscanner begin /k:"ms_order" /d:sonar.host.url="http://localhost:9000"  /d:sonar.token="token"
+dotnet sonarscanner begin /k:"ms_order" /d:sonar.host.url="http://localhost:9000"  /d:sonar.token="sqp_6420b353898e7f38921639017399c3545bdf1652"
 dotnet build       
-dotnet sonarscanner end /d:sonar.token="token"  
+dotnet sonarscanner end /d:sonar.token="sqp_6420b353898e7f38921639017399c3545bdf1652"  
 
 Actions : 
 Implémenter IDisposable et pas son propre Dispose pour eviter ocnfusion
@@ -50,3 +50,12 @@ dotnet test --list-tests
 
 ## pour ecrire dans la console pdt les tests
 dotnet test --logger "console;verbosity=detailed"
+
+dotnet sonarscanner begin /k:"ms_order" /d:sonar.host.url="http://localhost:9000" /d:sonar.token="sqp_6420b353898e7f38921639017399c3545bdf1652" /d:sonar.cs.opencover.reportsPaths="**/TestResults/**/*.xml"
+dotnet build
+dotnet test --no-build --collect:"XPlat Code Coverage" --results-directory TestResults/
+dotnet sonarscanner end /d:sonar.token="sqp_6420b353898e7f38921639017399c3545bdf1652"
+
+
+docker tag dperreaux/epsi4a-mspr4-msorder:0.5 europe-west9-docker.pkg.dev/mspr4-464617/order/dperreaux/epsi4a-mspr4-msorder:0.5
+

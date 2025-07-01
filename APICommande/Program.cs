@@ -1,19 +1,15 @@
-using System.Diagnostics.Metrics;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
-using MongoDB.Bson;
-using MongoDB.Driver;
-using RabbitMQ.Client.Exceptions;
 using Serilog;
 using Serilog.Debugging;
-using System.Text.Json;
-using Microsoft.Extensions.Configuration;
-using APIOrder.Utilitaires;
-using APIOrder.Model;
 using APIOrder.Endpoints;
+using APIOrder.TestEndpoints;
 using APIOrder.Services.Mongo;
 using APIOrder.Services.RabbitMQ;
 using APIOrder.Services;
+using OpenTelemetry.Trace;
+using OpenTelemetry.Exporter;
+using OpenTelemetry.Context.Propagation;
 
 try
 {
@@ -32,10 +28,19 @@ try
 
     Log.Logger = new LoggerConfiguration()
         .ReadFrom.Configuration(builder.Configuration)
+        .Enrich.FromLogContext()
+        .Enrich.WithMachineName()
         .CreateLogger();
 
     builder.Services.AddSerilog();
    
+    var writeToSections = builder.Configuration.GetSection("Serilog:WriteTo").GetChildren();
+    string? requestLogUri = writeToSections
+        .FirstOrDefault(s => s.GetValue<string>("Name") == "Http")?
+        .GetSection("Args")?
+        .GetValue<string>("requestUri");
+
+    var traceExporter = builder.Configuration.GetSection("Trace:Jaeger").Value!;
 
     builder.Services.AddOpenTelemetry()
         .ConfigureResource(resource => resource.AddService("APIMetrics"))
@@ -47,31 +52,98 @@ try
                 .AddMeter("APIMetrics.Meter");
 
             metrics.AddPrometheusExporter();
+        })
+        .WithTracing(tracerProviderBuilder =>
+        {
+            tracerProviderBuilder
+                .AddSource("MsOrder.ActivitySource")
+                .SetResourceBuilder(
+                    ResourceBuilder.CreateDefault()
+                        .AddService(serviceName: "ms-order",
+                                    serviceVersion: "0.5",
+                                    serviceInstanceId: Environment.MachineName))
+                .AddAspNetCoreInstrumentation(options =>
+                {
+                    // Exclure les requêtes vers le chemin /metrics des traces
+                    options.Filter = (httpContext) =>
+                    {
+                        return httpContext.Request.Path != "/metrics";
+                    };
+                })
+                // Si MsOrder fait des appels HttpClient vers d'autres services/DB:
+                .AddHttpClientInstrumentation(options =>
+                {
+                    // Règle pour exclure les requêtes HTTP SORTANTES vers l'endpoint du sink http Serilog
+                    options.FilterHttpRequestMessage = (httpRequestMessage) =>
+                    {
+                        if (httpRequestMessage.RequestUri == null || string.IsNullOrEmpty(requestLogUri))
+                        {
+                            return true;
+                        }
+                        return !httpRequestMessage.RequestUri.ToString().StartsWith(requestLogUri, StringComparison.OrdinalIgnoreCase);
+                    };
+                })
+
+                .AddOtlpExporter(options =>
+                {
+                    options.Endpoint = new Uri(traceExporter);
+                    options.Protocol = OtlpExportProtocol.Grpc;
+                });
         });
+
+    builder.Services.AddSingleton(Propagators.DefaultTextMapPropagator);
 
     builder.Services.AddDatabaseDeveloperPageExceptionFilter();
     builder.Services.AddSingleton<IDataBaseService, MongoOrderService>();
-     string rabbitMqHost = builder.Configuration.GetSection("RabbitMQ:Host").Value!;
-    builder.Services.AddSingleton(sp => new RabbitMQPublisher(rabbitMqHost));
+
+    string rabbitMqHost = builder.Configuration.GetSection("RabbitMQ:Host").Value!;
+    
+    builder.Services.AddSingleton(sp => {
+        var propagator = sp.GetRequiredService<TextMapPropagator>();
+        return new RabbitMQPublisher(rabbitMqHost,propagator);
+    });
     builder.Services.AddHostedService<RabbitMQBackgroundService>();
 
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddOpenApiDocument(config =>
     {
         config.DocumentName = "APIOrder";
-        config.Title = "API Order v0.4";
-        config.Version = "v1";
+        config.Title = "API Order";
+        config.Version = "v 0.5";
     });
 
     var app = builder.Build();
-    
+
     app.Use(async (context, next) =>
     {
-        if (context.Request.Path != "/metrics")
+        var correlationId = context.TraceIdentifier;
+        using (Serilog.Context.LogContext.PushProperty("CorrelationId", correlationId))
         {
-            Console.WriteLine($"Request: {context.Request.Path}");
+            bool isMetricsEndpoint = context.Request.Path == "/metrics";
+
+            if (!isMetricsEndpoint)
+            {
+                Log.Information("Incoming HTTP Request: {RequestMethod} {RequestPath}", context.Request.Method, context.Request.Path);
+                APIOrder.Utilitaires.AppMetrics.RequestCounter.Add(
+                    1,
+                    new KeyValuePair<string, object?>("method", context.Request.Method),
+                    new KeyValuePair<string, object?>("path", context.Request.Path)
+                );
+            }
+
+            await next();
+
+            if (!isMetricsEndpoint)
+            {
+                Log.Information("Outgoing HTTP Response: {StatusCode} for {RequestMethod} {RequestPath}", context.Response.StatusCode, context.Request.Method, context.Request.Path);
+                APIOrder.Utilitaires.AppMetrics.HttpResponseCounter.Add(
+                    1,
+                    new KeyValuePair<string, object?>("status_code", context.Response.StatusCode),
+                    new KeyValuePair<string, object?>("method", context.Request.Method),
+                    new KeyValuePair<string, object?>("path", context.Request.Path)
+                );
+            }
         }
-        await next();
     });
     
     var isDocker = builder.Configuration.GetValue<bool>("App:IsDocker");
@@ -87,8 +159,6 @@ try
         });
     }
 
-    
-
     var nameApi = "API Orders";
     var orders = app.MapGroup("/api/v1/orders");
     orders.MapGet("/", OrderEndpoints.GetAllOrders)
@@ -102,8 +172,13 @@ try
     orders.MapDelete("/{id}", OrderEndpoints.DeleteOrder)
         .WithTags(nameApi);
 
-    app.MapGet("/", () => "Gut")
+    app.MapGet("/", () =>
+    {
+        return Results.Ok("Réponse du microservice Order");
+    })
         .WithTags("Test");
+
+    app.MapGet("/trigger-error/{errorType}", TestEndpoints.TriggerError).WithTags("Test");
 
     app.UseOpenTelemetryPrometheusScrapingEndpoint();
 
